@@ -1,89 +1,112 @@
 require 'ostruct'
 require_relative 'state_machine/specification'
-require_relative 'state_machine/policy'
+require_relative 'state_machine/guard'
+require_relative 'state_machine/adapters/active_record'
 
 module StateMachine
-  def self.included(base)
-    base.send :extend, ClassMethods
-  end
-
-  def can_advance_state?
-    return false unless next_state
-    can_move_to_state?(next_state.name)
-  end
-
-  def can_move_to_state?(name)
-    required_guards(name).none?
-  end
-
-  def required_guards(state_name)
-    spec.states[state_name].guards.values.select do |guard|
-      guard.blocking && guard.policy_class.new(self).required?
-    end
-  end
-
-  def current_state
-    @current_state || spec.initial_state
-  end
-
-  def events
-    @events ||= []
-  end
-
-  def halted?
-    @halted
-  end
-
-  def halted_because
-    @halted_because
-  end
-
-  def halt(reason = nil)
-    @halted_because = reason
-    @halted = true
-  end
-
-  def next_state
-    current_state.next_state
-  end
-
-  def process_event!(name, *args)
-    event = current_state.events[name]
-
-    from = current_state
-    to = spec.states[event.transitions_to]
-    raise Error.new("Event[#{name}]'s transitions_to[#{event.transitions_to}]' is not a declared state") if to.nil?
-
-    @halted = false
-    @halted_because = nil
-
-    halt("Guard requirements are not met: #{required_guards(event.transitions_to).map(&:name)}") unless can_move_to_state?(event.transitions_to)
-    return false if halted?
-
-    puts "1. Before Transition (#{from}, #{to}, #{name}, #{args})"
-    return false if halted?
-    puts "2. Run Action #{event.name}"
-    return false if halted?
-    puts "3. On Transition (#{from}, #{to}, #{name}, #{args})"
-    puts "4. On Exit (#{from}, #{to}, #{name}, #{args})"
-    puts "5. Persist current state and event"
-    @current_state = to
-    events << OpenStruct.new(name: name, created_at: Time.now)
-    puts "6. On Entry (#{from}, #{to}, #{name}, #{args})"
-    puts "7. After Transition (#{from}, #{to}, #{name}, #{args})"
-    current_state.to_s
-  end
-
-  def spec
-    class << self
-      return workflow_spec if workflow_spec
+  module InstanceMethods
+    def can_advance_state?
+      return false unless next_state
+      can_move_to_state?(next_state.name)
     end
 
-    c = self.class
-    until c.workflow_spec || !(c.include? Workflow)
-      c = c.superclass
+    def can_move_to_state?(name)
+      required_guards(name).none?
     end
-    c.workflow_spec
+
+    def required_guards(state_name)
+      spec.states[state_name].guards.values.select do |guard|
+        guard.blocking && guard.required?(self)
+      end
+    end
+
+    def current_state
+      loaded_state = load_current_state
+      res = spec.states[loaded_state.to_sym] if loaded_state
+      res || spec.initial_state
+    end
+
+    def load_current_state
+      @current_state if instance_variable_defined? :@current_state
+    end
+
+    def events
+      @events ||= []
+    end
+
+    def halted?
+      @halted
+    end
+
+    def halted_because
+      @halted_because
+    end
+
+    def halt(reason = nil)
+      @halted_because = reason
+      @halted = true
+    end
+
+    def next_state
+      current_state.next_state
+    end
+
+    def persist_state_and_event(from, to, event_name)
+      puts "Persist current state and event"
+      @current_state = to
+      events << OpenStruct.new(name: event_name, created_at: Time.now)
+    end
+
+    def run_action(event_name, *args)
+      send(event_name, *args) if respond_to?(event_name)
+    end
+
+    def run_on_entry(state, prior_state, event_name, *args)
+      callback_method = "on_#{state}_entry"
+      send(callback_method, prior_state, event_name, *args) if respond_to?(callback_method)
+    end
+
+    def run_on_exit(state, new_state, event_name, *args)
+      callback_method = "on_#{state}_exit"
+      send(callback_method, new_state, event_name, *args) if respond_to?(callback_method)
+    end
+
+    def process_event!(name, *args)
+      event = current_state.events[name]
+
+      from = current_state
+      to = spec.states[event.transitions_to]
+      raise Error.new("Event[#{name}]'s transitions_to[#{event.transitions_to}]' is not a declared state") if to.nil?
+
+      @halted = false
+      @halted_because = nil
+
+      halt("Guard requirements are not met: #{required_guards(event.transitions_to).map(&:name)}") unless can_move_to_state?(event.transitions_to)
+      return false if halted?
+
+      run_action(name, *args)
+      return false if halted?
+
+      run_on_exit(from, to, name, *args)
+
+      persist_state_and_event(from, to, name)
+
+      run_on_entry(to, from, name, *args)
+
+      current_state.to_s
+    end
+
+    def spec
+      class << self
+        return workflow_spec if workflow_spec
+      end
+
+      c = self.class
+      until c.workflow_spec || !(c.include? Workflow)
+        c = c.superclass
+      end
+      c.workflow_spec
+    end
   end
 
   module ClassMethods
@@ -120,6 +143,14 @@ module StateMachine
           end
         end
       end
+    end
+  end
+
+  def self.included(base)
+    base.send :include, InstanceMethods
+    base.send :extend, ClassMethods
+    if const_defined?(:ActiveRecord) && base < ActiveRecord::Base
+      base.send :include, Adapter::ActiveRecord
     end
   end
 end

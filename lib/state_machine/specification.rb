@@ -1,6 +1,6 @@
 require_relative 'state'
 require_relative 'event'
-require_relative 'guard'
+require_relative 'guard_factory'
 require_relative 'errors'
 
 module StateMachine
@@ -39,7 +39,7 @@ module StateMachine
     end
 
     def guard(name, opts = {})
-      @scoped_state.guards.push(name, Guard.new(name: name, blocking: opts.fetch(:blocking, true)))
+      @scoped_state.guards.push(name, GuardFactory.create(name: name, blocking: opts.fetch(:blocking, true)))
     end
   end
 end

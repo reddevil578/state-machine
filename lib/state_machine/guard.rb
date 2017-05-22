@@ -1,30 +1,44 @@
-require 'active_support'
-require_relative 'errors'
+require_relative 'pipeline_specification'
 
 module StateMachine
-  class Guard
-    attr_reader :name, :blocking, :policy_class
+  module Guard
+    attr_reader :name, :blocking
 
-    def initialize(name:, blocking: true)
-      @name = name.to_sym
+    def initialize(name:, blocking:)
+      @name = name
       @blocking = blocking
-      @policy_class = policy_class
     end
 
-    def policy_class
-      @policy_class ||= ActiveSupport::Inflector.constantize(policy_class_name)
-    rescue NameError
-      raise MissingGuardError.new("missing guard '#{name}'")
+    def required?(subject)
+      raise NoMethodError.new('Guards must implement #required?')
     end
 
-    def to_s
-      @name.to_s
+    def self.included(base)
+      base.send :extend, ClassMethods
     end
 
-    private
+    def pipelines
+      pipeline_spec.pipelines
+    end
 
-    def policy_class_name
-      "StateMachine::Guard::#{ActiveSupport::Inflector.classify(name)}"
+    def pipeline_spec
+      class << self
+        return pipeline_spec if pipeline_spec
+      end
+      
+      c = self.class
+      until c.pipeline_spec || !(c.include? Guard)
+        c = c.superclass
+      end
+      c.pipeline_spec
+    end
+
+    module ClassMethods
+      attr_reader :pipeline_spec
+
+      def pipelines(&specification)
+        @pipeline_spec = PipelineSpecification.new(&specification)
+      end
     end
   end
 end

@@ -84,6 +84,11 @@ RSpec.describe StateMachine do
       it { is_expected.to match_array [:id_verified] }
     end
 
+    describe '#pipelines' do
+      subject { widget.required_guards(:approved).first.pipelines.keys }
+      it { is_expected.to match_array [:blockscore, :drivers_license] }
+    end
+
     describe '#approve!' do
       context 'with passing guards' do
         before { widget.id_verified = true }

@@ -1,11 +1,9 @@
 module StateMachine
-  class Guard
-    class NonBlocking
-      include StateMachine::Policy
+  class NonBlocking
+    include StateMachine::Guard
 
-      def required?
-        true
-      end
+    def required?(subject)
+      true
     end
   end
 end
