@@ -1,3 +1,4 @@
+require 'ostruct'
 require_relative 'state_machine/specification'
 require_relative 'state_machine/policy'
 
@@ -25,6 +26,23 @@ module StateMachine
     @current_state || spec.initial_state
   end
 
+  def events
+    @events ||= []
+  end
+
+  def halted?
+    @halted
+  end
+
+  def halted_because
+    @halted_because
+  end
+
+  def halt(reason = nil)
+    @halted_because = reason
+    @halted = true
+  end
+
   def next_state
     current_state.next_state
   end
@@ -34,17 +52,26 @@ module StateMachine
 
     from = current_state
     to = spec.states[event.transitions_to]
-
     raise Error.new("Event[#{name}]'s transitions_to[#{event.transitions_to}]' is not a declared state") if to.nil?
-    return false unless can_move_to_state?(event.transitions_to)
+
+    @halted = false
+    @halted_because = nil
+
+    halt("Guard requirements are not met: #{required_guards(event.transitions_to).map(&:name)}") unless can_move_to_state?(event.transitions_to)
+    return false if halted?
 
     puts "1. Before Transition (#{from}, #{to}, #{name}, #{args})"
+    return false if halted?
     puts "2. Run Action #{event.name}"
+    return false if halted?
     puts "3. On Transition (#{from}, #{to}, #{name}, #{args})"
     puts "4. On Exit (#{from}, #{to}, #{name}, #{args})"
-    puts "5. Persist current state"
+    puts "5. Persist current state and event"
+    @current_state = to
+    events << OpenStruct.new(name: name, created_at: Time.now)
     puts "6. On Entry (#{from}, #{to}, #{name}, #{args})"
     puts "7. After Transition (#{from}, #{to}, #{name}, #{args})"
+    current_state.to_s
   end
 
   def spec

@@ -27,6 +27,11 @@ RSpec.describe StateMachine do
     it { is_expected.to eq :new }
   end
 
+  describe '.next_state_name' do
+    subject { Widget.workflow_spec.states[:new].next_state_name }
+    it { is_expected.to eq :approved }
+  end
+
   describe '.state_names' do
     subject { Widget.workflow_spec.state_names }
     it { is_expected.to match_array [:new, :approved, :rejected] }
@@ -77,6 +82,27 @@ RSpec.describe StateMachine do
     describe '#required_guards' do
       subject { widget.required_guards(:approved).map(&:name) }
       it { is_expected.to match_array [:id_verified] }
+    end
+
+    describe '#approve!' do
+      context 'with passing guards' do
+        before { widget.id_verified = true }
+
+        it 'changes the current_state' do
+          expect(widget.current_state.name).to eq :new
+          expect(widget.approve!).to eq 'approved'
+          expect(widget.current_state.name).to eq :approved
+        end
+      end
+
+      context 'with failing guards' do
+        before { widget.id_verified = false }
+
+        it 'halts the transition' do
+          expect(widget.approve!).to be_falsy
+          expect(widget.halted_because).to eq 'Guard requirements are not met: [:id_verified]'
+        end
+      end
     end
   end
 end
