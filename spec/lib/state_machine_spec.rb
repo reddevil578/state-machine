@@ -13,7 +13,7 @@ RSpec.describe StateMachine do
     it 'immediately raises a MissingPolicyError' do
       expect {
         require './spec/support/error_cases/missing_guard_policy'
-      }.to raise_error StateMachine::MissingPolicyError
+      }.to raise_error StateMachine::MissingGuardError
     end
   end
 

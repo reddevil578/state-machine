@@ -3,5 +3,5 @@ module StateMachine
 
   class WorkflowDefinitionError < Error; end
 
-  class MissingPolicyError < Error; end
+  class MissingGuardError < Error; end
 end

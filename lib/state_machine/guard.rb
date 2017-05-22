@@ -14,7 +14,7 @@ module StateMachine
     def policy_class
       @policy_class ||= ActiveSupport::Inflector.constantize(policy_class_name)
     rescue NameError
-      raise MissingPolicyError.new("missing policy for guard '#{name}'")
+      raise MissingGuardError.new("missing guard '#{name}'")
     end
 
     def to_s
@@ -24,7 +24,7 @@ module StateMachine
     private
 
     def policy_class_name
-      "StateMachine::GuardPolicy::#{ActiveSupport::Inflector.classify(name)}"
+      "StateMachine::Guard::#{ActiveSupport::Inflector.classify(name)}"
     end
   end
 end

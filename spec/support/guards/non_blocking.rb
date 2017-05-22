@@ -1,5 +1,5 @@
 module StateMachine
-  module GuardPolicy
+  class Guard
     class NonBlocking
       include StateMachine::Policy
 
