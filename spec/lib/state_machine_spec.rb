@@ -17,52 +17,66 @@ RSpec.describe StateMachine do
     end
   end
 
-  context 'with valid workflow definition' do
-    it 'creates a workflow_spec' do
-      expect(Widget.workflow_spec).to be_a(StateMachine::Specification)
+  describe '.workflow_spec' do
+    subject { Widget.workflow_spec }
+    it { is_expected.to be_a(StateMachine::Specification) }
+  end
+
+  describe '.initial_state' do
+    subject { Widget.workflow_spec.initial_state.name }
+    it { is_expected.to eq :new }
+  end
+
+  describe '.state_names' do
+    subject { Widget.workflow_spec.state_names }
+    it { is_expected.to match_array [:new, :approved, :rejected] }
+  end
+
+  describe '.events' do
+    subject { Widget.workflow_spec.initial_state.events.keys }
+    it { is_expected.to match_array [:approve, :reject] }
+  end
+
+  describe '.transitions_to' do
+    subject { Widget.workflow_spec.states[:new].events[:approve].transitions_to }
+    it { is_expected.to eq :approved }
+  end
+
+  context 'instance methods' do
+    let(:widget) { Widget.new }
+
+    describe '#next_state' do
+      subject { widget.next_state.name }
+      it { is_expected.to eq :approved }
     end
 
-    it 'has the correct initial state' do
-      expect(Widget.workflow_spec.initial_state.name).to eq :new
-    end
-
-    it 'has the correct states' do
-      expect(Widget.workflow_spec.state_names).to \
-        match_array [:new, :approved, :rejected]
-    end
-
-    it 'has the correct events' do
-      expect(Widget.workflow_spec.initial_state.events.keys).to \
-        match_array [:approve, :reject]
-    end
-
-    it 'sets :transitions_to on the event correctly' do
-      expect(Widget.workflow_spec.states[:new].events[:approve].transitions_to).to \
-        eq :approved
-    end
-
-    context 'an individual Widget' do
-      let(:widget) { Widget.new }
-
-      it 'has the correct next_state' do
-        expect(widget.next_state.name).to eq :approved
-      end
-
-      it 'uses the provided policy to check can_advance_state?' do
-        widget.id_verified = false
-        expect(widget.can_advance_state?).to be_falsy
-        widget.id_verified = true
-        expect(widget.can_advance_state?).to be_truthy
-      end
-
-      it 'correctly calculates can_move_to_state' do
-        expect(widget.can_move_to_state?(:approved)).to be_falsy
+    describe '#can_move_to_state?' do
+      it 'returns true for :rejected state' do
         expect(widget.can_move_to_state?(:rejected)).to be_truthy
       end
 
-      it 'returns the correct required_guards' do
-        expect(widget.required_guards(:approved).map(&:name)).to eq [:id_verified]
+      it 'returns false for :approved state' do
+        expect(widget.can_move_to_state?(:approved)).to be_falsy
       end
+    end
+
+    describe '#can_advance_state?' do
+      subject { widget.can_advance_state? }
+
+      context 'when requirements are not met' do
+        before { widget.id_verified = false }
+        it { is_expected.to be_falsy }
+      end
+
+      context 'when requirements are not met' do
+        before { widget.id_verified = true }
+        it { is_expected.to be_truthy }
+      end
+    end
+
+    describe '#required_guards' do
+      subject { widget.required_guards(:approved).map(&:name) }
+      it { is_expected.to match_array [:id_verified] }
     end
   end
 end
