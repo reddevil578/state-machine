@@ -55,6 +55,11 @@ RSpec.describe StateMachine do
       it { is_expected.to eq :approved }
     end
 
+    describe '#state_progression' do
+      subject { widget.state_progression.keys }
+      it { is_expected.to match_array [:approved] }
+    end
+
     describe '#can_move_to_state?' do
       it 'returns true for :rejected state' do
         expect(widget.can_move_to_state?(:rejected)).to be_truthy
