@@ -14,10 +14,22 @@ module StateMachine
       required_guards(name).none?
     end
 
-    def required_guards(state_name)
+    def required_guards(state_name = next_state.name)
       spec.states[state_name].guards.values.select do |guard|
         guard.blocking && guard.required?(self)
       end
+    end
+
+    def state_progression
+      states = {}
+      add_next_state(states, current_state)
+      states
+    end
+
+    def add_next_state(hash, state)
+      return unless state.next_state
+      hash[state.next_state.name] = state.next_state
+      add_next_state(hash, state.next_state)
     end
 
     def current_state

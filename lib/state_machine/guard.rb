@@ -18,19 +18,11 @@ module StateMachine
     end
 
     def pipelines
-      pipeline_spec.pipelines
+      pipeline_spec ? pipeline_spec.pipelines : {}
     end
 
     def pipeline_spec
-      class << self
-        return pipeline_spec if pipeline_spec
-      end
-      
-      c = self.class
-      until c.pipeline_spec || !(c.include? Guard)
-        c = c.superclass
-      end
-      c.pipeline_spec
+      self.class.pipeline_spec
     end
 
     module ClassMethods
