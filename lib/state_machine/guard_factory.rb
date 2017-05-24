@@ -17,7 +17,7 @@ module StateMachine
     end
 
     def self.guard_class_name
-      "StateMachine::#{ActiveSupport::Inflector.classify(@name)}"
+      "StateMachine::#{ActiveSupport::Inflector.camelize(@name)}"
     end
   end
 end

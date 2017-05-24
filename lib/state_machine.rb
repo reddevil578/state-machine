@@ -64,7 +64,7 @@ module StateMachine
     end
 
     def persist_state_and_event(from, to, event_name)
-      puts "Persist current state and event"
+      puts "#{event_name}! moving to #{to}"
       @current_state = to
       events << OpenStruct.new(name: event_name, created_at: Time.now)
     end
@@ -85,6 +85,9 @@ module StateMachine
 
     def process_event!(name, *args)
       event = current_state.events[name]
+      raise NoTransitionAllowed.new(
+        "There is no event #{name.to_sym} defined for the #{current_state} state") \
+        if event.nil?
 
       from = current_state
       to = spec.states[event.transitions_to]
